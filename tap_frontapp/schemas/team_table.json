@@ -1,0 +1,78 @@
+{
+    "type": ["null", "object"],
+    "additionalProperties": false,
+    "properties": {
+	"analytics_date": {
+	    "type": ["null", "string"],
+	    "format": "date-time"
+	},
+	"analytics_range": {
+	    "type": ["null", "string"]
+	},
+      	"teammate_v": {
+            "type": ["null", "string"]
+	},
+      	"teammate_url": {
+            "type": ["null", "string"]
+	},
+      	"teammate_id": {
+            "type": ["null", "integer"]
+	},
+      	"teammate_p": {
+            "type": ["null", "string"]
+	},
+	"num_conversations_v": {
+	    "type": ["null", "integer"]
+	},
+	"num_conversations_p": {
+	    "type": ["null", "integer"]
+	},
+	"num_conversations_v": {
+	    "type": ["null", "integer"]
+	},
+	"avg_message_conversations_v": {
+	    "type": ["null", "number"]
+	},
+	"avg_message_conversations_p": {
+	    "type": ["null", "number"]
+	},
+	"avg_reaction_time_v": {
+	    "type": ["null", "number"]
+	},
+	"avg_reaction_time_p": {
+	    "type": ["null", "number"]
+	},
+	"avg_first_reaction_time_v": {
+	    "type": ["null", "number"]
+	},
+	"avg_first_reaction_time_p": {
+	    "type": ["null", "number"]
+	},
+	"num_messages_v": {
+	    "type": ["null", "integer"]
+	},
+	"num_messages_p": {
+	    "type": ["null", "integer"]
+	},
+	"num_sent_v": {
+	    "type": ["null", "integer"]
+	},
+  	"num_sent_p": {
+	    "type": ["null", "integer"]
+        },
+	"num_replied_v": {
+	    "type": ["null", "integer"]
+	},
+  	"num_replied_p": {
+	    "type": ["null", "integer"]
+        },
+	"num_composed_v": {
+	    "type": ["null", "integer"]
+	},
+  	"num_composed_p": {
+	    "type": ["null", "integer"]
+        }
+    },
+    "key_properties": ["analytics_date","analytics_range","teammate_v"],
+    "bookmark_properties": ["analytics_date","analytics_range"]
+}
