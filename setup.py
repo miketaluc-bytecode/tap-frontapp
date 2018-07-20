@@ -6,10 +6,9 @@ setup(
     name="tap-frontapp",
     version="0.3.1",
     description="Singer.io tap for extracting data from the FrontApp API",
-    author="Stitch",
+    author="bytcode.io",
     url="http://singer.io",
     classifiers=["Programming Language :: Python :: 3 :: Only"],
-    py_modules=["tap_frontapp"],
     install_requires=[
         "singer-python>=5.1.1",
         "pendulum",

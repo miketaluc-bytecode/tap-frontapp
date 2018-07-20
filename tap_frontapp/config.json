@@ -1,6 +1,0 @@
-{
-  "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzY29wZXMiOlsic2hhcmVkOioiLCJwcml2YXRlOioiXSwiaXNzIjoiZnJvbnQiLCJzdWIiOiJ0aGVndWlsZF9jbyJ9.VWs1_ChaowHjVbFcXHiRO6wEOx-uSjD9H--vu6R3HjQ",
-  "start_date": "2018-07-01T00:00:00Z"
-  "metric": "team_table"
-  "incremental_range": "daily"
-}

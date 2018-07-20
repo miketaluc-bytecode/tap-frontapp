@@ -1,2 +1,2 @@
 include LICENSE
-include tap_emarsys/schemas/*.json
+include tap_frontapp/schemas/*.json

@@ -1,10 +1,5 @@
-import os
-import hashlib
 import json
 import time
-from datetime import datetime
-from binascii import hexlify
-from base64 import b64encode
 
 import requests
 import backoff
@@ -20,35 +15,16 @@ class MetricsRateLimitException(Exception):
     pass
 
 class Client(object):
-    BASE_URL = 'https://api2.frontapp.com/analytics'
+    BASE_URL = 'https://api2.frontapp.com'
 
     def __init__(self, config):
         self.token = config.get('token')
-        # this should really be an array of metrics rather than just one.  just going to leave it one for now. 
-        #self.metrics = config.get('metrics')
         self.metric = config.get('metric')
         self.session = requests.Session()
 
         self.calls_remaining = None
         self.limit_reset = None
 
-# mike don't think i need this 
-# though we could prob use the created date
-#    def get_wsse_header(self):
-        # commenting since we aren't passing an encrypted password
-        # should we encrypt the token?  not for now.
-        # nonce = hexlify(os.urandom(16)).decode('utf-8')
-        # created = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S+00:00')
-        # sha1 = hashlib.sha1(str.encode(nonce + created + self.secret)).hexdigest()
-        # password_digest = bytes.decode(b64encode(str.encode(sha1)))
-
-        #return ('UsernameToken Username="{}", ' +
-        #        'PasswordDigest="{}", Nonce="{}", Created="{}"').format(
-        #        'Created="{}"').format(
-        #            self.username,
-        #            password_digest,
-        #            nonce,
-        #            created)
 
     def url(self, path):
         return self.BASE_URL + path
@@ -66,27 +42,37 @@ class Client(object):
         if 'headers' not in kwargs:
             kwargs['headers'] = {}
         if self.token:
-            kwargs['headers']['Authorization: Bearer '] = self.token
-#        kwargs['headers']['X-WSSE'] = self.get_wsse_header()
+            kwargs['headers']['Authorization'] = self.token
 
         kwargs['headers']['Content-Type'] = 'application/json'
 
         if 'endpoint' in kwargs:
             endpoint = kwargs['endpoint']
             del kwargs['endpoint']
-# mike should prob change the name of metrics
             with metrics.http_request_timer(endpoint) as timer:
+                #print(', '.join(['{}={!r}'.format(k, v) for k, v in kwargs.items()]))
                 response = requests.request(method, self.url(path), **kwargs)
+                #print('final url=',response.url)
                 timer.tags[metrics.Tag.http_status_code] = response.status_code
 
-# here we need to look at the response and ask if Progress = 100.  if not, wait one second then make the call again
+                # frontapp's API takes an initial request then needs 1 sec to produce the report
+                #so here we just run the request again
+                #print('sleeping 2')
+                time.sleep(2)
+                response = requests.request(method, self.url(path), **kwargs)
+                #print('final2 url=',response.url)
 
 
         else:
             response = requests.request(method, self.url(path), **kwargs)
+            #print('final3 url=',response.url)
+            #print('sleeping2 2')
+            time.sleep(2)
+            response = requests.request(method, self.url(path), **kwargs)
+            #print('final4 url=',response.url)
 
         self.calls_remaining = int(response.headers['X-Ratelimit-Remaining'])
-        self.limit_reset = int(response.headers['X-Ratelimit-Reset'])
+        self.limit_reset = int(float(response.headers['X-Ratelimit-Reset']))
 
         if response.status_code in [429, 503]:
             raise RateLimitException()
@@ -97,7 +83,8 @@ class Client(object):
         except:
             LOGGER.error('{} - {}'.format(response.status_code, response.text))
             raise
-        return response.json()['data']
+        #print('get data=',response.json()['metrics'][0]['rows'])
+        return response.json()['metrics'][0]['rows']
 
     def get(self, path, **kwargs):
         return self.request('get', path, **kwargs)

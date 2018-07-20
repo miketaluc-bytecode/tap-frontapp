@@ -1,5 +1,4 @@
 import time
-from functools import partial
 
 import pendulum
 import singer
@@ -9,10 +8,7 @@ from ratelimit import limits, sleep_and_retry, RateLimitException
 from backoff import on_exception, expo, constant
 
 from .schemas import (
-    IDS,
-    get_contacts_raw_fields,
-    normalize_fieldname,
-    METRICS_AVAILABLE
+    IDS
 )
 from .http import MetricsRateLimitException
 
@@ -35,8 +31,8 @@ def get_date_and_integer_fields(stream):
     for prop, json_schema in stream.schema.properties.items():
         _type = json_schema.type
         if isinstance(_type, list) and 'integer' in _type or \
-           _type == 'integer':
-           integer_fields.append(prop)
+            _type == 'integer':
+            integer_fields.append(prop)
         elif json_schema.format == 'date-time':
             date_fields.append(prop)
     return date_fields, integer_fields
@@ -58,7 +54,7 @@ def select_fields(mdata, obj):
     for key, value in obj.items():
         field_metadata = mdata.get(('properties', key))
         if field_metadata and \
-           (field_metadata.get('selected') is True or \
+            (field_metadata.get('selected') is True or \
             field_metadata.get('inclusion') == 'automatic'):
             new_obj[key] = value
     return new_obj
@@ -67,132 +63,142 @@ def select_fields(mdata, obj):
 @on_exception(expo, RateLimitException, max_tries=5)
 @sleep_and_retry
 @limits(calls=1, period=61) # 60 seconds needed to be padded by 1 second to work
-def post_metric(atx, metric, start_date, end_date, campaign_id):
-    LOGGER.info('Metrics query - metric: {} start_date: {} end_date: {} campaign_id: {}'.format(
+def get_metric(atx, metric, start_date, end_date):
+    LOGGER.info('Metrics query - metric: {} start_date: {} end_date: {} '.format(
         metric,
         start_date,
-        end_date,
-        campaign_id))
-    return atx.client.post(
-        '/email/responses',
-        {
-            'type': metric,
-            'start_date': start_date,
-            'end_date': end_date,
-            'campaign_id': campaign_id
-        },
-        endpoint='metrics_job')
+        end_date))
+    return atx.client.get('/analytics', params={'start': start_date, \
+            'end': end_date, 'metrics[]':metric}, endpoint='analytics')
 
-def sync_metric(atx, campaign_id, metric, start_date, end_date):
+def sync_metric(atx, metric, incremental_range, start_date, end_date):
     with singer.metrics.job_timer('daily_aggregated_metric'):
-        job = post_metric(atx,
-                          metric,
-                          start_date.to_date_string(),
-                          end_date.to_date_string(),
-                          campaign_id)
-
-        LOGGER.info('Metrics query job - {}'.format(job['id']))
-
         start = time.monotonic()
+        # we've really moved this functionality to the request in the http script
+        #so we don't expect that this will actually have to run mult times
         while True:
             if (time.monotonic() - start) >= MAX_METRIC_JOB_TIME:
                 raise Exception('Metric job timeout ({} secs)'.format(
                     MAX_METRIC_JOB_TIME))
-            LOGGER.info('Polling metrics query job - {}'.format(job['id']))
-            data = atx.client.get('/email/{}/responses'.format(job['id']), endpoint='metrics')
+            data = get_metric(atx, metric, start_date, end_date)
             if data != '':
                 break
             else:
                 time.sleep(METRIC_JOB_POLL_SLEEP)
 
-    if len(data['contact_ids']) == 1 and data['contact_ids'][0] == '':
-        return
-
     data_rows = []
-    metric_date = start_date.isoformat()
-    for contact_id in data['contact_ids']:
-        data_rows.append({
-            'date': metric_date,
-            'metric': metric,
-            'contact_id': contact_id,
-            'campaign_id': campaign_id
-        })
+    #metric_date = start_date.isoformat()
+    # transform the team_table data
+    if metric == 'team_table':
+        rnum = 0
+        for row in data:
+            rnum += 1
+            if rnum == 1:
+                data_rows.append({
+                    "analytics_date": start_date,
+                    "analytics_range": incremental_range,
+                    "teammate_v": row[0]['v'],
+                    "teammate_url": "",
+                    "teammate_id": 0,
+                    "teammate_p": row[0]['p'],
+                    "num_conversations_v": row[1]['v'],
+                    "num_conversations_p": row[1]['p'],
+                    "avg_message_conversations_v": row[2]['v'],
+                    "avg_message_conversations_p": row[2]['p'],
+                    "avg_reaction_time_v": row[3]['v'],
+                    "avg_reaction_time_p": row[3]['p'],
+                    "avg_first_reaction_time_v": row[4]['v'],
+                    "avg_first_reaction_time_p": row[4]['p'],
+                    "num_messages_v": row[5]['v'],
+                    "num_messages_p": row[5]['p'],
+                    "num_sent_v": row[6]['v'],
+                    "num_sent_p": row[6]['p'],
+                    "num_replied_v": row[7]['v'],
+                    "num_replied_p": row[7]['p'],
+                    "num_composed_v": row[8]['v'],
+                    "num_composed_p": row[8]['p']
+                    })
+            else:
+                data_rows.append({
+                    "analytics_date": start_date,
+                    "analytics_range": incremental_range,
+                    "teammate_v": row[0]['v'],
+                    "teammate_url": row[0]['url'],
+                    "teammate_id": row[0]['id'],
+                    "teammate_p": row[0]['v'],
+                    "num_conversations_v": row[1]['v'],
+                    "num_conversations_p": row[1]['p'],
+                    "avg_message_conversations_v": row[2]['v'],
+                    "avg_message_conversations_p": row[2]['p'],
+                    "avg_reaction_time_v": row[3]['v'],
+                    "avg_reaction_time_p": row[3]['p'],
+                    "avg_first_reaction_time_v": row[4]['v'],
+                    "avg_first_reaction_time_p": row[4]['p'],
+                    "num_messages_v": row[5]['v'],
+                    "num_messages_p": row[5]['p'],
+                    "num_sent_v": row[6]['v'],
+                    "num_sent_p": row[6]['p'],
+                    "num_replied_v": row[7]['v'],
+                    "num_replied_p": row[7]['p'],
+                    "num_composed_v": row[8]['v'],
+                    "num_composed_p": row[8]['p']
+                    })
 
-    write_records('metrics', data_rows)
+    write_records(metric, data_rows)
 
-def write_metrics_state(atx, campaigns_to_resume, metrics_to_resume, date_to_resume):
-    write_bookmark(atx.state, 'metrics', 'campaigns_to_resume', campaigns_to_resume)
-    write_bookmark(atx.state, 'metrics', 'metrics_to_resume', metrics_to_resume)
-    write_bookmark(atx.state, 'metrics', 'date_to_resume', date_to_resume.to_date_string())
+def write_metrics_state(atx, metric, date_to_resume):
+    write_bookmark(atx.state, metric, 'date_to_resume', date_to_resume.to_date_string())
     atx.write_state()
 
-def sync_metrics(atx,metric):
+def sync_metrics(atx, metric):
     test_mode = atx.config.get('test_mode')
-    stream = atx.catalog.get_stream('metrics')
-    bookmark = atx.state.get('bookmarks', {}).get('metrics', {})
+    incremental_range = atx.config.get('incremental_range')
+    stream = atx.catalog.get_stream(metric)
+    bookmark = atx.state.get('bookmarks', {}).get(metric, {})
 
     mdata = metadata.to_map(stream.metadata)
 
     start_date = pendulum.parse(atx.config.get('start_date', 'now'))
+    #print("start_date=",start_date)
     end_date = pendulum.parse(atx.config.get('end_date', 'now'))
 
     start_date = bookmark.get('last_metric_date', start_date)
+    #print("start_date=",start_date)
 
-    campaigns_to_resume = bookmark.get('campaigns_to_resume')
-    if campaigns_to_resume:
-        campaign_ids = campaigns_to_resume
-        last_metrics = bookmark.get('metrics_to_resume')
-        last_date = bookmark.get('date_to_resume')
-        if last_date:
-            last_date = pendulum.parse(last_date)
-    else:
-        campaign_ids = (
-            list(map(lambda x: x['id'],
-                     filter(lambda x: x['deleted'] is None,
-                            campaigns)))
-        )
-        metrics_to_resume = metrics_selected
-        last_date = None
-        last_metrics = None
+    last_date = bookmark.get('date_to_resume', end_date)
+    #print("last_date=",last_date)
 
+    # no real reason to assign this other than the naming
+    # makes better sense once we go into the loop
     current_date = last_date or start_date
-
-    if test_mode:
-        end_date = current_date
-        metrics_selected = metrics_selected[:2]
+    #print("current_date=",current_date)
 
     while current_date <= end_date:
-        next_date = current_date.add(days=1)
-        campaigns_to_resume = campaign_ids.copy()
-        for campaign_id in campaign_ids:
-            campaign_metrics = last_metrics or metrics_selected
-            last_metrics = None
-            metrics_to_resume = campaign_metrics.copy()
-            for metric in campaign_metrics:
-                sync_metric(atx,
-                            campaign_id,
-                            metric,
-                            current_date,
-                            next_date)
-                write_metrics_state(atx, campaigns_to_resume, metrics_to_resume, current_date)
-                metrics_to_resume.remove(metric)
-            campaigns_to_resume.remove(campaign_id)
+        if incremental_range == "daily":
+            next_date = current_date.add(days=1)
+        elif incremental_range == "hourly":
+            next_date = current_date.add(hours=1)
+
+        ut_current_date = int(current_date.timestamp())
+        ut_next_date = int(next_date.timestamp())
+        sync_metric(atx, metric, incremental_range, ut_current_date, ut_next_date)
+        write_metrics_state(atx, metric, current_date)
         current_date = next_date
 
-    reset_stream(atx.state, 'metrics')
-    write_bookmark(atx.state, 'metrics', 'last_metric_date', end_date.to_date_string())
+    reset_stream(atx.state, metric)
+    write_bookmark(atx.state, metric, 'last_metric_date', end_date.to_date_string())
     atx.write_state()
 
 def sync_selected_streams(atx):
     selected_streams = atx.selected_stream_ids
     last_synced_stream = atx.state.get('last_synced_stream')
 
-    if IDS.TEAM_TABLE in selected_streams and last_synced_stream != IDS.TEAM_TABLE:
-        sync_metrics(atx,'team_table')
+    # last synced stream = None
+# mike had to change this to get it to work though don't know why
+    #if IDS.TEAM_TABLE in selected_streams and last_synced_stream != IDS.TEAM_TABLE:
+    if IDS.TEAM_TABLE in selected_streams:
+        sync_metrics(atx, 'team_table')
         atx.state['last_synced_stream'] = IDS.TEAM_TABLE
         atx.write_state()
 
     # add additional analytics here
-
-    atx.state['last_synced_stream'] = None
-    atx.write_state()
