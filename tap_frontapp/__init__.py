@@ -19,7 +19,6 @@ LOGGER = singer.get_logger()
 #    atx.client.get('/settings')
 
 
-# with tap-emarsys, they do it this way where the catalog is read in from a call to the api
 def discover(atx):
     catalog = Catalog([])
     for tap_stream_id in schemas.STATIC_SCHEMA_STREAM_IDS:
