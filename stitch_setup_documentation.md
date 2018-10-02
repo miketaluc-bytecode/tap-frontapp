@@ -32,7 +32,7 @@ To set up FrontApp in Stitch, you need to get your JSON web token directly from 
 
 With each run of the integration, the following data set is extracted and replicated to the data warehouse:
 
-- **Team**: Daily or hourly aggregated team member statistics since the last_update (last completed run of the integration) through the most recent day or hour respectively. On the first run, ALL increments since the **Start Date** will be replicated.
+- **Team Table**: Daily or hourly aggregated team member statistics since the last_update (last completed run of the integration) through the most recent day or hour respectively. On the first run, ALL increments since the **Start Date** will be replicated.
 
 ---
 
